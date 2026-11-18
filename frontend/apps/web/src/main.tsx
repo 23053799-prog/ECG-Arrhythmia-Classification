@@ -2,12 +2,16 @@ import { StrictMode } from "react"
 import { createRoot } from "react-dom/client"
 
 import { BrowserRouter } from "react-router"
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
+import {
+  QueryClient,
+  QueryClientProvider,
+} from "@tanstack/react-query"
 
 import "@workspace/ui/globals.css"
 
 import { App } from "./App"
 import { ThemeProvider } from "./components/theme-provider"
+import { USE_MOCKS } from "./lib/constants"
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -18,20 +22,37 @@ const queryClient = new QueryClient({
   },
 })
 
-createRoot(document.getElementById("root")!).render(
-  <StrictMode>
+async function bootstrap() {
+  // Start MSW before React makes any API requests.
+  if (USE_MOCKS) {
+    const { worker } = await import("./mocks/browser")
 
-    <ThemeProvider>
+    await worker.start({
+      onUnhandledFrame: "bypass",
 
-      <QueryClientProvider client={queryClient}>
+      serviceWorker: {
+        url: "/mockServiceWorker.js",
+      },
+    })
+  }
 
-        <BrowserRouter>
-          <App />
-        </BrowserRouter>
+  const rootElement = document.getElementById("root")
 
-      </QueryClientProvider>
+  if (!rootElement) {
+    throw new Error("Root element was not found.")
+  }
 
-    </ThemeProvider>
+  createRoot(rootElement).render(
+    <StrictMode>
+      <ThemeProvider>
+        <QueryClientProvider client={queryClient}>
+          <BrowserRouter>
+            <App />
+          </BrowserRouter>
+        </QueryClientProvider>
+      </ThemeProvider>
+    </StrictMode>,
+  )
+}
 
-  </StrictMode>
-)
+void bootstrap()
